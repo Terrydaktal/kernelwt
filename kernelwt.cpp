@@ -124,8 +124,8 @@ int main(int argc, CHAR* volatile * argv)
 
 	rewind(functionsfile);
 
-	char** functions  = (char**) calloc(count, sizeof(char*));
-	unsigned long long* addresses = (unsigned long long*)calloc(count, sizeof(unsigned long long));
+	char** functions  = (char**) calloc(count+1, sizeof(char*));
+	unsigned long long* addresses = (unsigned long long*)calloc(count+1, sizeof(unsigned long long));
 	
 	count =0;
 
@@ -147,7 +147,7 @@ int main(int argc, CHAR* volatile * argv)
 
 	while (fgets(line, 20, lengthsfile))
 	{
-		addresses[count] += (strtoull(line, &endptr, 16)-1);
+		((char*)addresses[count]) += (strtoull(line, &endptr, 16)-1);
 		count++;
 	}
 

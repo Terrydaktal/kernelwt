@@ -161,5 +161,50 @@ int main(int argc, CHAR* volatile * argv)
 	result &= VirtualLock(bufferOut, bufferSize);
 	result &= VirtualLock((LPVOID)argv, bufferSize);
 
+	//open a handle to the device
+	hDevice = CreateFileW(SymLink,
+		FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL, OPEN_EXISTING, 0, NULL);
+
+	//if any of the above fail, then free potential buffer and unlock any ranges
+	if (!result || !hDevice) goto fail;
+
+	//send an IOCTL to the driver
+	result = DeviceIoControl(
+		hDevice,
+		BENCHMARK_DRV_IOCTL,
+		(LPVOID)argv,
+		bufferSize,
+		(LPVOID)bufferOut,
+		bufferSize,
+		&bytesReturned, NULL);
+
+	std::cout << "\nPerformance Counter stats for " << AppName << ":\n\n";
+
+	for (int i = 2; i < argc; i++) {
+		std::cout << "    " << argv[i] << ":   " << bufferOut[i] << "\n";
+	}
+
+	std::cout << "\n=< Note: the events are benchmarked in batches of 4\n";
+	std::cout << "=<Use 1 counter for the least noise";
+
+	//close the handle to the device
+	CloseHandle(hDevice);
+	
+	fail:   //this will fail when there is no handle, so no need to close handle
+
+	//unlock any ranges
+	VirtualUnlock(hApp, PEHeader->OptionalHeader.SizeOfImage);
+	VirtualUnlock(bufferOut, bufferSize);
+	VirtualUnlock((LPVOID)argv, bufferSize);
+
+	//unload the library
+	FreeLibrary(hApp);
+
+	//free the heap allocation
+	free(bufferOut);
+
+	return 0;
 }
 

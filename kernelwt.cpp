@@ -90,8 +90,11 @@ int main(int argc, CHAR* volatile * argv)
 	HANDLE hDevice;
 	PCWSTR SymLink = L"\\\\.\\kernelwt";
 	DWORD bytesReturned;
-	HMODULE hApp;
-	PIMAGE_NT_HEADERS64 PEHeader;
+	char *endptr;
+        unsigned long long process = strtoull(argv[7], &endptr, 16);
+        unsigned long long waittime = strtoull(argv[1], &endptr, 10);
+        unsigned long long idabase = strtoull(argv[5], &endptr, 16);
+        unsigned long long modulebase = strtoull(argv[6], &endptr, 16);
 
 	//sanity check of parameters
 
@@ -116,16 +119,14 @@ int main(int argc, CHAR* volatile * argv)
 	fopen_s(&lengthsfile, argv[4], "r");
 
 	if (!functionsfile || !addressesfile || !lengthsfile) { return false; };
-	char *endptr;
 	char line[20];
 	int count =0;
 	while (fgets(line, 20, functionsfile)) count++;
 
-
 	rewind(functionsfile);
 
 	char** functions  = (char**) calloc(count+1, sizeof(char*));
-	unsigned long long* addresses = (unsigned long long*)calloc(count+1, sizeof(unsigned long long));
+	unsigned long long* addresses = (unsigned long long*)calloc((2*(count+1))+2, sizeof(unsigned long long));
 	
 	count =0;
 
@@ -147,12 +148,15 @@ int main(int argc, CHAR* volatile * argv)
 
 	while (fgets(line, 20, lengthsfile))
 	{
-		((char*)addresses[count]) += (strtoull(line, &endptr, 16)-1);
+		((char*)addresses[count]) += (strtoull(line, &endptr, 16)-1-idabase+modulebase);
 		count++;
 	}
 
 
-	//allocate and zero the output buffer on the heap
+	addresses[count-1][count] = waittime;
+        addresses[count-1][count+1] = process;
+        
+        //allocate and zero the output buffer on the heap
 	size_t bufferSize = sizeof(unsigned long long)*argc;
 	unsigned long long* bufferOut = (unsigned long long*) calloc(argc, sizeof(unsigned long long));
 
@@ -174,7 +178,7 @@ int main(int argc, CHAR* volatile * argv)
 	result = DeviceIoControl(
 		hDevice,
 		BENCHMARK_DRV_IOCTL,
-		(LPVOID)argv,
+		(LPVOID)addresses,
 		bufferSize,
 		(LPVOID)bufferOut,
 		bufferSize,
